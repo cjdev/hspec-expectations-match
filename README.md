@@ -1,6 +1,6 @@
 # hspec-expectations-match [![Build Status](https://travis-ci.org/cjdev/hspec-expectations-match.svg?branch=master)](https://travis-ci.org/cjdev/hspec-expectations-match)
 
-`hspec-expectations-match` is a Haskell package that provides a single expectation for use with [`hspec`][hspec], `shouldMatch`. The `shouldMatch` expectation uses Template Haskell to assert that a value matches a particular pattern.
+`hspec-expectations-match` is a Haskell package that provides expectations for use with [`hspec`][hspec] that use Template Haskell to assert that a value matches a particular pattern. The primary expectation is `shouldMatch`:
 
 ```haskell
 {-# LANGUAGE TemplateHaskell #-}

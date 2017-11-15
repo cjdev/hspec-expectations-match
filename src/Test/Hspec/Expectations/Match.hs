@@ -2,26 +2,29 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-|
-  This module implements an @hspec@ expectation, 'shouldMatch'. This is a
-  Template Haskell function that makes it possible to assert that a value
-  matches a particular pattern, and it even allows values bound by the pattern
-  to be extracted.
+  This package provides expectations for use with @hspec@ that use Template
+  Haskell to assert that a value matches a particular pattern. Furthermore,
+  any bindings created by the pattern will be returned if the pattern is
+  successfully matched, making it easier to extract the result of some assertion
+  and use it to make further assertions.
 
-  The function should be used with Template Haskell’s expression and pattern
+  These functions should be used with Template Haskell’s expression and pattern
   quoters, notated by @[| ... |]@ and @[p| ... |]@, respectively.
 -}
 module Test.Hspec.Expectations.Match
   ( shouldMatch
+  , shouldReturnAndMatch
   ) where
 
 import Control.Monad.Base (MonadBase, liftBase)
 import Data.Maybe (fromMaybe)
+import GHC.Stack (HasCallStack)
 import Test.Hspec.Expectations (expectationFailure)
 
 import Language.Haskell.TH.Ppr
 import Language.Haskell.TH.Syntax
 
-assertPatternMatchFailure :: (MonadBase IO m, Show a) => String -> a -> m b
+assertPatternMatchFailure :: (HasCallStack, MonadBase IO m, Show a) => String -> a -> m b
 assertPatternMatchFailure pat val =
     liftBase (expectationFailure (showsPrec 11 val "" ++ " failed to match pattern " ++ pat))
     -- expectationFailure should always throw, but it returns IO (), not IO a,
@@ -62,6 +65,27 @@ shouldMatch qExpr qPat = do
     [ Match pat (NormalB successExpr) []
     , Match (VarP valName) (NormalB failureExpr) []
     ]
+
+-- | Like 'Test.Hspec.Expectations.shouldReturn' combined with 'shouldMatch'.
+-- Like 'Test.Hspec.Expectations.shouldReturn', the provided expression should
+-- produce an action that, once run, produces a value. Like 'shouldMatch', the
+-- resulting value will be matched against the provided pattern.
+shouldReturnAndMatch :: Q Exp -> Q Pat -> Q Exp
+shouldReturnAndMatch qExpr qPat = do
+  expr <- qExpr
+  pat <- qPat
+  patStr <- showsPat 11 pat
+
+  valName <- newName "val"
+
+  let successExpr = VarE 'pure `AppE` patBindingsToTupleExp pat
+  let failureExpr = VarE 'assertPatternMatchFailure `AppE` LitE (StringL (patStr "")) `AppE` VarE valName
+
+  pure $ VarE '(>>=) `AppE` expr `AppE` LamE [VarP valName]
+    (CaseE (VarE valName)
+      [ Match pat (NormalB successExpr) []
+      , Match WildP (NormalB failureExpr) []
+      ])
 
 patBindingsToTupleExp :: Pat -> Exp
 patBindingsToTupleExp = TupE . map VarE . patBindings
