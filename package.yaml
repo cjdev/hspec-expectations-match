@@ -2,7 +2,22 @@ name: hspec-expectations-match
 version: 0.1.0.0
 category: Testing
 synopsis: An hspec expectation that asserts a value matches a pattern.
-description: An hspec expectation that asserts a value matches a pattern.
+description: |
+  This package provides a single expectation for use with @hspec@,
+  'shouldMatch'. The 'shouldMatch' expectation uses Template Haskell to assert
+  that a value matches a particular pattern.
+
+  >>> $([|Just True|] `shouldMatch` [p|Just _|])
+  >>> $([|Nothing|] `shouldMatch` [p|Just _|])
+
+  Additionally, any bindings created by the pattern will be returned if the
+  pattern is successfully matched, making it easier to extract the result of
+  some assertion and use it to make further assertions.
+
+  >>> $([|Just True|] `shouldMatch` [p|Just x|])
+  True
+  >>> $([|[1, 2]|] `shouldMatch` [p|[x, y]|])
+  (1, 2)
 
 copyright: 2017 CJ Affiliate by Conversant
 license: ISC
@@ -11,6 +26,7 @@ maintainer: Alexis King <lexi.lambda@gmail.com>
 github: cjdev/hspec-expectations-match
 
 extra-source-files:
+- CHANGELOG.md
 - package.yaml
 - README.md
 - stack.yaml
