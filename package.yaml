@@ -1,0 +1,61 @@
+name: hspec-expectations-match
+version: 0.1.0.0
+category: Testing
+synopsis: An hspec expectation that asserts a value matches a pattern.
+description: An hspec expectation that asserts a value matches a pattern.
+
+copyright: 2017 CJ Affiliate by Conversant
+license: ISC
+author: Alexis King <lexi.lambda@gmail.com>
+maintainer: Alexis King <lexi.lambda@gmail.com>
+github: cjdev/hspec-expectations-match
+
+extra-source-files:
+- package.yaml
+- README.md
+- stack.yaml
+
+ghc-options: -Wall
+default-extensions:
+- ApplicativeDo
+- ConstraintKinds
+- DefaultSignatures
+- DeriveGeneric
+- ExistentialQuantification
+- FlexibleContexts
+- FlexibleInstances
+- FunctionalDependencies
+- GADTs
+- GeneralizedNewtypeDeriving
+- KindSignatures
+- LambdaCase
+- MultiParamTypeClasses
+- NamedFieldPuns
+- OverloadedStrings
+- RankNTypes
+- ScopedTypeVariables
+- StandaloneDeriving
+- TupleSections
+- TypeApplications
+- TypeOperators
+
+library:
+  dependencies:
+  - base >= 4.9 && < 5
+  - hspec-expectations >= 0.3.2 && < 1
+  - template-haskell >= 2.11 && < 2.13
+  - transformers-base < 1
+  source-dirs: src
+
+tests:
+  hspec-expectations-th-test-suite:
+    dependencies:
+    - base
+    - hspec
+    - hspec-expectations-match
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -with-rtsopts=-N
+    main: Main.hs
+    source-dirs: test
