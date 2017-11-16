@@ -31,10 +31,20 @@ spec = do
       c `shouldBe` 'y'
 
   describe "shouldReturnAndMatch" $
-    it "matches the result of an action against a pattern" $ example $ do
+    it "matches the result of an action against a pattern" $ do
       $([|pure (Just True)|] `shouldReturnAndMatch` [p|Just _|])
 
       $([|pure Nothing|] `shouldReturnAndMatch` [p|Just True|]) `shouldThrow` anyException
 
       a <- $([|pure (Just True)|] `shouldReturnAndMatch` [p|Just x|])
       a `shouldBe` True
+
+  describe "assertDo" $
+    it "automatically annotates pattern binds with shouldReturnAndMatch" $ do
+      $(assertDo [|do
+        Just x <- pure $ Just True
+        x `shouldBe` True|])
+
+      $(assertDo [|do
+        Just x <- pure Nothing
+        x `shouldBe` True|]) `shouldThrow` anyException

@@ -14,6 +14,7 @@
 module Test.Hspec.Expectations.Match
   ( shouldMatch
   , shouldReturnAndMatch
+  , assertDo
   ) where
 
 import Control.Monad.Base (MonadBase, liftBase)
@@ -89,25 +90,29 @@ shouldReturnAndMatch qExpr qPat = do
 
 patBindingsToTupleExp :: Pat -> Exp
 patBindingsToTupleExp = TupE . map VarE . patBindings
-  where
-    patBindings (LitP _) = []
-    patBindings (VarP nm) = [nm]
-    patBindings (TupP pats) = concatMap patBindings pats
-    patBindings (UnboxedTupP pats) = concatMap patBindings pats
-    patBindings (ConP _ pats) = concatMap patBindings pats
-    patBindings (InfixP patA _ patB) = patBindings patA ++ patBindings patB
-    patBindings (UInfixP patA _ patB) = patBindings patA ++ patBindings patB
-    patBindings (ParensP pat) = patBindings pat
-    patBindings (TildeP pat) = patBindings pat
-    patBindings (BangP pat) = patBindings pat
-    patBindings (AsP nm pat) = nm : patBindings pat
-    patBindings WildP = []
-    patBindings (RecP _ fieldPats) = concatMap (patBindings . snd) fieldPats
-    patBindings (ListP pats) = concatMap patBindings pats
-    patBindings (SigP pat _) = patBindings pat
-    patBindings (ViewP _ pat) = patBindings pat
+
+patBindingsToTuplePat :: Pat -> Pat
+patBindingsToTuplePat = TupP . map VarP . patBindings
+
+patBindings :: Pat -> [Name]
+patBindings (LitP _) = []
+patBindings (VarP nm) = [nm]
+patBindings (TupP pats) = concatMap patBindings pats
+patBindings (UnboxedTupP pats) = concatMap patBindings pats
+patBindings (ConP _ pats) = concatMap patBindings pats
+patBindings (InfixP patA _ patB) = patBindings patA ++ patBindings patB
+patBindings (UInfixP patA _ patB) = patBindings patA ++ patBindings patB
+patBindings (ParensP pat) = patBindings pat
+patBindings (TildeP pat) = patBindings pat
+patBindings (BangP pat) = patBindings pat
+patBindings (AsP nm pat) = nm : patBindings pat
+patBindings WildP = []
+patBindings (RecP _ fieldPats) = concatMap (patBindings . snd) fieldPats
+patBindings (ListP pats) = concatMap patBindings pats
+patBindings (SigP pat _) = patBindings pat
+patBindings (ViewP _ pat) = patBindings pat
 #if MIN_VERSION_GLASGOW_HASKELL(8,2,1,0)
-    patBindings (UnboxedSumP pat _ _) = patBindings pat
+patBindings (UnboxedSumP pat _ _) = patBindings pat
 #endif
 
 -- The pretty-printer provided by template-haskell always prints things with
@@ -185,3 +190,39 @@ showLit (FloatPrimL r) = show (fromRational r :: Float) ++ "#"
 showLit (DoublePrimL r) = show (fromRational r :: Double) ++ "##"
 showLit (StringPrimL s) = show s ++ "#"
 showLit (CharPrimL c) = show c ++ "#"
+
+-- | Instruments a @do@ block by automatically inserting uses of
+-- 'shouldReturnAndMatch' for monadic bindings. Specifically, the transformation
+-- converts this:
+--
+-- @
+-- \$('assertDo' [|do
+--   [x, y] <- 'return' [1, 2]
+--   x `'Test.Hspec.Expectations.shouldBe`` 1
+--   y `'Test.Hspec.Expectations.shouldBe`` 2|])
+-- @
+--
+-- ...into this:
+--
+-- @
+-- do (x, y) <- $([|'return' [1, 2]|] `'shouldReturnAndMatch'` [p|[x, y]|])
+--    x `'Test.Hspec.Expectations.shouldBe`` 1
+--    y `'Test.Hspec.Expectations.shouldBe`` 2
+-- @
+--
+-- This makes it much easier to read @do@ blocks that make significant use of
+-- 'shouldReturnAndMatch'.
+--
+-- Note that this transformation /only/ applies to monadic bindings (not @let@
+-- bindings), and it does not occur when the pattern on the left hand side is a
+-- plain variable or a wildcard (e.g. @x@ or @_@).
+assertDo :: Q Exp -> Q Exp
+assertDo qDoExp = qDoExp >>= \case
+    DoE stmts -> DoE <$> traverse annotateStatement stmts
+    _ -> fail "assertDo: expected a do block"
+  where
+    annotateStatement stmt@(BindS pat expr) = case pat of
+      VarP _ -> pure stmt
+      WildP -> pure stmt
+      _ -> BindS (patBindingsToTuplePat pat) <$> shouldReturnAndMatch (pure expr) (pure pat)
+    annotateStatement stmt = pure stmt
