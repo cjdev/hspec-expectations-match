@@ -1,7 +1,7 @@
 name: hspec-expectations-match
 version: 0.2.0.0
 category: Testing
-synopsis: An hspec expectation that asserts a value matches a pattern.
+synopsis: hspec expectations that assert a value matches a pattern.
 description: |
   This package provides expectations for use with @hspec@ that use Template
   Haskell to assert that a value matches a particular pattern.

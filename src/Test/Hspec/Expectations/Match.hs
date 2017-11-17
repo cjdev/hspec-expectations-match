@@ -196,16 +196,16 @@ showLit (CharPrimL c) = show c ++ "#"
 -- converts this:
 --
 -- @
--- \$('assertDo' [|do
---   [x, y] <- 'return' [1, 2]
---   x `'Test.Hspec.Expectations.shouldBe`` 1
---   y `'Test.Hspec.Expectations.shouldBe`` 2|])
+-- \$('assertDo'
+--   [|do [x, y] <- 'return' [1, 2]
+--        x `'Test.Hspec.Expectations.shouldBe`` 1
+--        y `'Test.Hspec.Expectations.shouldBe`` 2|])
 -- @
 --
 -- ...into this:
 --
 -- @
--- do (x, y) <- $([|'return' [1, 2]|] `'shouldReturnAndMatch'` [p|[x, y]|])
+-- do (x, y) <- $([|'return' [1, 2]|] `'shouldReturnAndMatch`` [p|[x, y]|])
 --    x `'Test.Hspec.Expectations.shouldBe`` 1
 --    y `'Test.Hspec.Expectations.shouldBe`` 2
 -- @
