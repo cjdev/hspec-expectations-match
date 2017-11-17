@@ -42,6 +42,10 @@ spec = do
   describe "assertDo" $
     it "automatically annotates pattern binds with shouldReturnAndMatch" $ do
       $(assertDo [|do
+        () <- pure ()
+        pure ()|])
+
+      $(assertDo [|do
         Just x <- pure $ Just True
         x `shouldBe` True|])
 

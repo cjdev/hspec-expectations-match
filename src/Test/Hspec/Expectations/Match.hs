@@ -214,8 +214,9 @@ showLit (CharPrimL c) = show c ++ "#"
 -- 'shouldReturnAndMatch'.
 --
 -- Note that this transformation /only/ applies to monadic bindings (not @let@
--- bindings), and it does not occur when the pattern on the left hand side is a
--- plain variable or a wildcard (e.g. @x@ or @_@).
+-- bindings), and it does not occur when the pattern on the left hand side
+-- already fully covers all potential values (that is, when the pattern could
+-- not possibly fail to match).
 assertDo :: Q Exp -> Q Exp
 assertDo qDoExp = qDoExp >>= \case
     DoE stmts -> DoE <$> traverse annotateStatement stmts
@@ -224,5 +225,37 @@ assertDo qDoExp = qDoExp >>= \case
     annotateStatement stmt@(BindS pat expr) = case pat of
       VarP _ -> pure stmt
       WildP -> pure stmt
-      _ -> BindS (patBindingsToTuplePat pat) <$> shouldReturnAndMatch (pure expr) (pure pat)
+      _ -> do
+        hasOtherCases <- patternHasOtherCases pat
+        if hasOtherCases
+          then BindS (patBindingsToTuplePat pat) <$> shouldReturnAndMatch (pure expr) (pure pat)
+          else pure stmt
     annotateStatement stmt = pure stmt
+
+    patternHasOtherCases (LitP _) = pure True
+    patternHasOtherCases (VarP _) = pure False
+    patternHasOtherCases (TupP pats) = or <$> traverse patternHasOtherCases pats
+    patternHasOtherCases (UnboxedTupP pats) = or <$> traverse patternHasOtherCases pats
+    patternHasOtherCases (ConP nm pats) = do
+      DataConI _ _ tyNm <- reify nm
+      tyInfo <- reify tyNm
+      conHasOtherCases <- case tyInfo of
+        TyConI dec -> case dec of
+          DataD _ _ _ _ cons _ -> pure (length cons > 1)
+          NewtypeD{} -> pure False
+          _ -> fail ("patternHasOtherCases: internal error; unexpected declaration in TyConI: " ++ show dec)
+        _ -> fail ("patternHasOtherCases: internal error; unexpected Info in DataConI: " ++ show tyInfo)
+      if conHasOtherCases
+        then pure True
+        else or <$> traverse patternHasOtherCases pats
+    patternHasOtherCases (InfixP patA nm patB) = patternHasOtherCases (ConP nm [patA, patB])
+    patternHasOtherCases (UInfixP patA nm patB) = patternHasOtherCases (ConP nm [patA, patB])
+    patternHasOtherCases (ParensP pat) = patternHasOtherCases pat
+    patternHasOtherCases (TildeP pat) = patternHasOtherCases pat
+    patternHasOtherCases (BangP pat) = patternHasOtherCases pat
+    patternHasOtherCases (AsP _ pat) = patternHasOtherCases pat
+    patternHasOtherCases WildP = pure False
+    patternHasOtherCases (RecP _ fieldPats) = or <$> traverse (patternHasOtherCases . snd) fieldPats
+    patternHasOtherCases (ListP _) = pure True
+    patternHasOtherCases (SigP pat _) = patternHasOtherCases pat
+    patternHasOtherCases (ViewP _ _) = pure True
